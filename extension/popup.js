@@ -19,7 +19,7 @@ $('delayForm').onsubmit=async e=>{
   const r=await chrome.runtime.sendMessage({type:'set-delay',minutes:input.valueAsNumber});
   if(!r?.ok)throw new Error(r?.error || '変更できませんでした');
   input.value=r.minutes;
-  delayFeedback(`${r.minutes}分で保存しました。`);
+  delayFeedback(r.minutes===0?'0分（待ち時間なし）で保存しました。':`${r.minutes}分で保存しました。`);
  }catch(e){delayFeedback('保存できませんでした：'+e.message,true);}
  finally{input.disabled=false;button.disabled=false;}
 };

@@ -1,13 +1,13 @@
 importScripts('audio-config.js');
 let creating,queue=Promise.resolve();
 const defaultDelayMinutes=3;
-const validDelayMinutes=n=>Number.isInteger(n)&&n>=1&&n<=1440;
+const validDelayMinutes=n=>Number.isInteger(n)&&n>=0&&n<=1440;
 const savedDelayMinutes=n=>validDelayMinutes(n)?n:defaultDelayMinutes;
 const resultAlarm=/^result-wait:(\d+):([0-9a-z_-]{1,80}):([0-9a-f-]{36})$/i;
 function alarmName(sender,nonce){
   return `result-wait:${sender.tab?.id}:${sender.documentId}:${nonce}`;
 }
-async function play(){
+async function play(allow){
   const contexts=await chrome.runtime.getContexts({contextTypes:['OFFSCREEN_DOCUMENT'],documentUrls:[chrome.runtime.getURL('sound.html')]});
   if(!contexts.length){
     if(!creating)creating=chrome.offscreen.createDocument({url:'sound.html',reasons:['AUDIO_PLAYBACK'],justification:'有効にした戦闘終了通知の音を再生するため'}).finally(()=>{creating=null;});
@@ -18,6 +18,7 @@ async function play(){
   const custom=customSounds.find(x=>x.id===selectedSound);
   const missing=!preset&&!BattleBellAudio.validCustom(custom);
   const source=preset?chrome.runtime.getURL(preset.file):missing?chrome.runtime.getURL('bell.wav'):custom.dataUrl;
+  if(allow&&!(await allow()))return '';
   const r=await chrome.runtime.sendMessage({target:'sound',source,volume:Math.max(0,Math.min(1,Number(volume)||0))});
   if(!r?.ok)throw new Error(r?.error||'音声ページが応答しませんでした');
   return r.warning||(missing?'保存した音声が見つからないため、標準ベルで通知しました。':'');
@@ -34,7 +35,7 @@ async function handle(msg){
     await chrome.storage.local.set({enabled:!!msg.enabled});return {ok:true};
   }
   if(msg.type==='set-delay'){
-    if(!validDelayMinutes(msg.minutes))return {ok:false,error:'1〜1440の整数を指定してください。'};
+    if(!validDelayMinutes(msg.minutes))return {ok:false,error:'0〜1440の整数を指定してください。'};
     await chrome.storage.local.set({resultDelayMinutes:msg.minutes});
     return {ok:true,minutes:msg.minutes};
   }
@@ -44,10 +45,11 @@ async function handle(msg){
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   if(!msg||msg.target==='sound')return;
   const popup=sender.url===chrome.runtime.getURL('popup.html');
-  let game=false;
+  let game=false,isResult=false;
   try{
     const u=new URL(sender.url);
     game=sender.tab?.id!==undefined&&sender.frameId===0&&u.protocol==='https:'&&['game.granbluefantasy.jp','gbf.game.mbga.jp'].includes(u.hostname);
+    isResult=(u.pathname+u.hash).startsWith('/#result_multi/');
   }catch{}
   let task;
   if(popup&&['test-sound','stop-sound','status','set-enabled','set-delay'].includes(msg.type)){
@@ -55,10 +57,26 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   }else if(game){
     const name=alarmName(sender,msg.nonce);
     if(!resultAlarm.test(name))return;
-    if(msg.type==='arm-result-alert'){
+    if(msg.type==='arm-result-alert'&&isResult){
       task=serial(async()=>{
         const {enabled,resultDelayMinutes}=await chrome.storage.local.get({enabled:false,resultDelayMinutes:defaultDelayMinutes});
-        if(enabled)await chrome.alarms.create(name,{when:Date.now()+savedDelayMinutes(resultDelayMinutes)*60_000});
+        if(!enabled)return false;
+        const minutes=savedDelayMinutes(resultDelayMinutes);
+        if(minutes===0)return true;
+        await chrome.alarms.create(name,{when:Date.now()+minutes*60_000});
+        return false;
+      }).then(async immediate=>{
+        if(immediate)await play(async()=>{
+          // 0分はアラームを作らず、音の準備後に同じドキュメントと結果URLを再確認。
+          try{
+            const {enabled=false}=await chrome.storage.local.get('enabled');
+            if(!enabled)return false;
+            const answer=await chrome.tabs.sendMessage(sender.tab.id,{type:'confirm-result-alert',nonce:msg.nonce},{documentId:sender.documentId});
+            if(!answer?.ready)return false;
+            const latest=await chrome.storage.local.get('enabled');
+            return Boolean(latest.enabled);
+          }catch{return false;}
+        });
         return {ok:true};
       });
     }else if(msg.type==='cancel-result-alert'){
