@@ -17,13 +17,14 @@
     seen=null;
     cancel();
   }
+  const isMultiResult=()=> (location.pathname+location.hash).startsWith('/#result_multi/');
   function tick(){
     if(!enabled||suspended)return;
     const here=location.href;
     if(here===seen)return;
     seen=here;
     cancel();
-    if((location.pathname+location.hash).startsWith('/#result_multi/')){
+    if(isMultiResult()){
       const nonce=crypto.randomUUID();
       pending={nonce,here}; // 比較用のURLはタブ内だけ。保存・送信しない。
       send('arm-result-alert',nonce);
@@ -35,7 +36,7 @@
   }
   chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
     if(msg?.type!=='confirm-result-alert'||sender.id!==chrome.runtime.id)return;
-    const ready=Boolean(enabled&&!suspended&&pending&&
+    const ready=Boolean(enabled&&!suspended&&isMultiResult()&&pending&&
       pending.nonce===msg.nonce&&pending.here===location.href);
     if(ready)pending=null;
     reply({ready});

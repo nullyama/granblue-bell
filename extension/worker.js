@@ -45,11 +45,10 @@ async function handle(msg){
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   if(!msg||msg.target==='sound')return;
   const popup=sender.url===chrome.runtime.getURL('popup.html');
-  let game=false,isResult=false;
+  let game=false;
   try{
     const u=new URL(sender.url);
     game=sender.tab?.id!==undefined&&sender.frameId===0&&u.protocol==='https:'&&['game.granbluefantasy.jp','gbf.game.mbga.jp'].includes(u.hostname);
-    isResult=(u.pathname+u.hash).startsWith('/#result_multi/');
   }catch{}
   let task;
   if(popup&&['test-sound','stop-sound','status','set-enabled','set-delay'].includes(msg.type)){
@@ -57,7 +56,8 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   }else if(game){
     const name=alarmName(sender,msg.nonce);
     if(!resultAlarm.test(name))return;
-    if(msg.type==='arm-result-alert'&&isResult){
+    // sender.url は送信元ホストの確認に限定。SPA遷移直後の結果判定は当該ドキュメント側で行う。
+    if(msg.type==='arm-result-alert'){
       task=serial(async()=>{
         const {enabled,resultDelayMinutes}=await chrome.storage.local.get({enabled:false,resultDelayMinutes:defaultDelayMinutes});
         if(!enabled)return false;

@@ -4,9 +4,9 @@
 
 ## 導入
 
-1. [ダウンロード（v1.0.7）](https://github.com/nullyama/granblue-bell/raw/refs/heads/main/downloads/granblue-bell-1.0.7.zip)をダウンロードして展開します。
+1. [ダウンロード（v1.0.8）](https://github.com/nullyama/granblue-bell/raw/refs/heads/main/downloads/granblue-bell-1.0.8.zip)をダウンロードして展開します。
 2. Chromeで `chrome://extensions/` を開き、右上の「デベロッパー モード」をオンにします。
-3. 「パッケージ化されていない拡張機能を読み込む」で、展開したフォルダを選びます。
+3. 「パッケージ化されていない拡張機能を読み込む」で、展開したフォルダを選びます。上書きで更新するときは、拡張機能とグラブルのタブを再読み込みします。
 
 ## 使い方
 
