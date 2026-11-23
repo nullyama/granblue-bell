@@ -4,7 +4,7 @@
 
 ## 導入
 
-1. [共有用ZIP（v1.0.6）](https://github.com/nullyama/granblue-bell/raw/refs/heads/main/downloads/granblue-bell-1.0.6.zip)をダウンロードして展開します。
+1. [ダウンロード（v1.0.6）](https://github.com/nullyama/granblue-bell/raw/refs/heads/main/downloads/granblue-bell-1.0.6.zip)をダウンロードして展開します。
 2. Chromeで `chrome://extensions/` を開き、右上の「デベロッパー モード」をオンにします。
 3. 「パッケージ化されていない拡張機能を読み込む」で、展開したフォルダを選びます。
 
@@ -12,4 +12,4 @@
 
 - 拡張機能のメニューで通知をオンにします。
 - 待ち時間は初期値3分。変えたいときは「結果画面を開いてから鳴るまで」に分数を入れて保存します。
-- マルチのリザルト画面に設定時間だけ留まると1回鳴ります。途中で画面を離れると鳴りません。
+- 通知をオンにした状態で、マルチのリザルト（URLが `/#result_multi/` で始まる画面）を開くと待ち時間の計測が始まります。同じ画面に設定時間だけ留まると1回鳴ります。途中で別のページへ移動すると取り消されます。
