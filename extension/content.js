@@ -26,7 +26,7 @@
     cancel();
     if(isMultiResult()){
       const nonce=crypto.randomUUID();
-      pending={nonce,here}; // 比較用のURLはタブ内だけ。保存・送信しない。
+      pending={nonce,here,used:new Set()}; // 比較用のURLはタブ内だけ。保存・送信しない。
       send('arm-result-alert',nonce);
     }
   }
@@ -36,9 +36,10 @@
   }
   chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
     if(msg?.type!=='confirm-result-alert'||sender.id!==chrome.runtime.id)return;
-    const ready=Boolean(enabled&&!suspended&&isMultiResult()&&pending&&
-      pending.nonce===msg.nonce&&pending.here===location.href);
-    if(ready)pending=null;
+    const {phase}=msg;
+    const ready=Boolean((phase==='initial'||phase==='reminder')&&enabled&&!suspended&&isMultiResult()&&pending&&
+      pending.nonce===msg.nonce&&pending.here===location.href&&!pending.used.has(phase));
+    if(ready)pending.used.add(phase);
     reply({ready});
   });
   chrome.storage.onChanged.addListener((changes,area)=>{

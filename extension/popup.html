@@ -2,11 +2,14 @@
 <header><img src="icons/bell-48.png" alt="" width="36" height="36"><div><h1>戦闘終了ベル</h1><p>グラブル用</p></div></header>
 <main>
 <section class="monitor"><div class="monitor-row"><div><h2 id="statusTitle">通知はオフ</h2></div><label class="switch"><input id="enabled" type="checkbox" role="switch" aria-label="戦闘終了の通知"><span aria-hidden="true"></span></label></div>
+<div class="monitor-row immediate-row"><div><label for="immediate">結果画面ですぐ鳴らす</label><p>開いた時に1回だけ。</p></div><label class="switch"><input id="immediate" type="checkbox" role="switch" aria-label="結果画面ですぐ鳴らす" disabled><span aria-hidden="true"></span></label></div>
+<p id="immediateFeedback" role="status"></p>
 <form id="delayForm" class="delay-form">
-  <label for="delayMinutes">結果画面を開いてから鳴るまで</label>
+  <label for="delayMinutes">リマインドまでの時間</label>
   <div class="delay-controls"><input id="delayMinutes" name="minutes" type="number" min="0" max="1440" step="1" value="3" required disabled aria-describedby="delayHelp"><span>分</span><button id="saveDelay" type="submit" class="secondary" disabled>保存</button></div>
-  <p id="delayHelp">0〜1440分（1分刻み）。0分ですぐ鳴ります。次に開く結果画面から適用します。</p>
+  <p id="delayHelp">同じ結果画面にいる場合だけ、開いてから設定の時間後に1回。0分はリマインドなし。次の結果から適用します。</p>
   <p id="delayFeedback" role="status"></p>
+  <p id="silentHelp" hidden>即時ベルとリマインドが両方オフです。</p>
 </form></section>
 <section class="sound"><h2>通知音</h2><label class="sr-only" for="sound">通知音を選ぶ</label><select id="sound"><option value="bell">ベル</option></select><div class="volume-row"><label for="volume">音量</label><input id="volume" type="range" min="0" max="100" value="50"><output id="volumeLabel" for="volume">50%</output></div><div class="audio-actions"><button id="test" class="primary">▶ 試聴する</button><button id="add" class="secondary">音声を追加</button><button id="remove" class="text-button" hidden>削除</button></div><div id="deleteConfirm" class="delete-confirm" hidden><p>選択中の音声をこの拡張から削除しますか？<br>元のファイルは残ります。</p><button id="confirmRemove" class="danger">削除する</button> <button id="cancelRemove" class="secondary">キャンセル</button></div><input id="file" type="file" accept=".mp3,.wav,.ogg,.m4a" hidden><p id="feedback" role="status" aria-live="polite"></p></section>
 

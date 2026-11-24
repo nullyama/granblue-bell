@@ -1,5 +1,6 @@
 const $=id=>document.getElementById(id),A=BattleBellAudio;
-let customSounds=[],selected='bell',previewing=false,previewTimer;
+let customSounds=[],selected='bell',previewing=false,previewTimer,savedMinutes=3;
+function modeNote(){$('silentHelp').hidden=$('immediate').checked||savedMinutes!==0;}
 function resetPreview(){previewing=false;clearTimeout(previewTimer);$('test').textContent='▶ 試聴する';}
 function feedback(text,error=false){$('feedback').textContent=text;$('feedback').dataset.error=String(error);}
 async function refresh(){
@@ -7,6 +8,7 @@ async function refresh(){
  if(r?.ok===false)throw new Error(r.error);
  $('enabled').checked=!!r.enabled;
  $('statusTitle').textContent=r.enabled?'通知はオン':'通知はオフ';
+ $('immediate').checked=!!r.immediateEnabled;savedMinutes=r.minutes;modeNote();
  return r;
 }
 function delayFeedback(text,error=false){$('delayFeedback').textContent=text;$('delayFeedback').dataset.error=String(error);}
@@ -18,10 +20,23 @@ $('delayForm').onsubmit=async e=>{
  try{
   const r=await chrome.runtime.sendMessage({type:'set-delay',minutes:input.valueAsNumber});
   if(!r?.ok)throw new Error(r?.error || '変更できませんでした');
-  input.value=r.minutes;
-  delayFeedback(r.minutes===0?'0分（待ち時間なし）で保存しました。':`${r.minutes}分で保存しました。`);
+  savedMinutes=r.minutes;input.value=savedMinutes;modeNote();
+  delayFeedback(savedMinutes===0?'リマインドなしで保存しました。':`${r.minutes}分で保存しました。`);
  }catch(e){delayFeedback('保存できませんでした：'+e.message,true);}
  finally{input.disabled=false;button.disabled=false;}
+};
+$('immediate').onchange=async()=>{
+ const input=$('immediate'),out=$('immediateFeedback'),next=input.checked;
+ input.disabled=true;
+ try{
+  const r=await chrome.runtime.sendMessage({type:'set-immediate',enabled:next});
+  if(!r?.ok)throw new Error(r?.error||'変更できませんでした');
+  input.checked=r.immediateEnabled;
+  out.textContent=input.checked?'即時ベルをオンにしました。':'即時ベルをオフにしました。';
+  out.dataset.error='false';
+ }catch(e){
+  input.checked=!next;out.textContent='保存できませんでした：'+e.message;out.dataset.error='true';
+ }finally{input.disabled=false;modeNote();}
 };
 function renderSounds(){
  $('deleteConfirm').hidden=true;
@@ -77,4 +92,4 @@ $('confirmRemove').onclick=async()=>{
  const item=customSounds.find(x=>x.id===selected);if(!item)return;
  try{const next=customSounds.filter(x=>x.id!==selected);await chrome.storage.local.set({customSounds:next,selectedSound:'bell'});customSounds=next;selected='bell';renderSounds();$('sound').focus();feedback('削除しました。標準ベルに戻しました。');}catch(e){feedback('削除できませんでした：'+e.message,true);}
 };
-(async()=>{try{const s=await chrome.storage.local.get({volume:0.5,selectedSound:'bell',customSounds:[]});customSounds=s.customSounds;selected=s.selectedSound;renderSounds();$('volume').value=s.volume*100;$('volumeLabel').value=`${Math.round(s.volume*100)}%`;const r=await refresh();$('delayMinutes').value=r.minutes;$('delayMinutes').disabled=false;$('saveDelay').disabled=false;}catch(e){feedback('設定を読み込めませんでした：'+e.message,true);}})();
+(async()=>{try{const s=await chrome.storage.local.get({volume:0.5,selectedSound:'bell',customSounds:[]});customSounds=s.customSounds;selected=s.selectedSound;renderSounds();$('volume').value=s.volume*100;$('volumeLabel').value=`${Math.round(s.volume*100)}%`;const r=await refresh();$('delayMinutes').value=r.minutes;$('delayMinutes').disabled=false;$('saveDelay').disabled=false;$('immediate').disabled=false;}catch(e){feedback('設定を読み込めませんでした：'+e.message,true);}})();

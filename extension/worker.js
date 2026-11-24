@@ -28,6 +28,20 @@ async function stopAudio(){
   const c=await chrome.runtime.getContexts({contextTypes:['OFFSCREEN_DOCUMENT'],documentUrls:[chrome.runtime.getURL('sound.html')]});
   if(c.length)await chrome.runtime.sendMessage({target:'sound',stop:true});
 }
+async function alertSettings(phase){
+  const {enabled=false,immediateEnabled=true}=await chrome.storage.local.get({enabled:false,immediateEnabled:true});
+  return enabled&&(phase!=='initial'||immediateEnabled!==false);
+}
+async function playResult(tabId,documentId,nonce,phase){
+  if(!await alertSettings(phase))return;
+  await play(async()=>{
+    if(!await alertSettings(phase))return false;
+    try{
+      const answer=await chrome.tabs.sendMessage(tabId,{type:'confirm-result-alert',nonce,phase},{documentId});
+      return answer?.ready===true&&await alertSettings(phase);
+    }catch{return false;}
+  });
+}
 async function handle(msg){
   if(msg.type==='stop-sound'){await stopAudio();return {ok:true};}
   if(msg.type==='test-sound')return {ok:true,warning:await play()};
@@ -39,8 +53,13 @@ async function handle(msg){
     await chrome.storage.local.set({resultDelayMinutes:msg.minutes});
     return {ok:true,minutes:msg.minutes};
   }
-  const {enabled,resultDelayMinutes}=await chrome.storage.local.get({enabled:false,resultDelayMinutes:defaultDelayMinutes});
-  return {ok:true,enabled,minutes:savedDelayMinutes(resultDelayMinutes)};
+  if(msg.type==='set-immediate'){
+    if(typeof msg.enabled!=='boolean')return {ok:false,error:'即時ベルの設定が不正です。'};
+    await chrome.storage.local.set({immediateEnabled:msg.enabled});
+    return {ok:true,immediateEnabled:msg.enabled};
+  }
+  const {enabled,resultDelayMinutes,immediateEnabled}=await chrome.storage.local.get({enabled:false,resultDelayMinutes:defaultDelayMinutes,immediateEnabled:true});
+  return {ok:true,enabled,minutes:savedDelayMinutes(resultDelayMinutes),immediateEnabled:immediateEnabled!==false};
 }
 chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
   if(!msg||msg.target==='sound')return;
@@ -51,7 +70,7 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
     game=sender.tab?.id!==undefined&&sender.frameId===0&&u.protocol==='https:'&&['game.granbluefantasy.jp','gbf.game.mbga.jp'].includes(u.hostname);
   }catch{}
   let task;
-  if(popup&&['test-sound','stop-sound','status','set-enabled','set-delay'].includes(msg.type)){
+  if(popup&&['test-sound','stop-sound','status','set-enabled','set-delay','set-immediate'].includes(msg.type)){
     task=serial(()=>handle(msg));
   }else if(game){
     const name=alarmName(sender,msg.nonce);
@@ -59,24 +78,19 @@ chrome.runtime.onMessage.addListener((msg,sender,reply)=>{
     // sender.url は送信元ホストの確認に限定。SPA遷移直後の結果判定は当該ドキュメント側で行う。
     if(msg.type==='arm-result-alert'){
       task=serial(async()=>{
-        const {enabled,resultDelayMinutes}=await chrome.storage.local.get({enabled:false,resultDelayMinutes:defaultDelayMinutes});
-        if(!enabled)return false;
+        const {enabled,resultDelayMinutes,immediateEnabled}=await chrome.storage.local.get({enabled:false,resultDelayMinutes:defaultDelayMinutes,immediateEnabled:true});
+        if(!enabled)return {immediate:false};
         const minutes=savedDelayMinutes(resultDelayMinutes);
-        if(minutes===0)return true;
-        await chrome.alarms.create(name,{when:Date.now()+minutes*60_000});
-        return false;
-      }).then(async immediate=>{
-        if(immediate)await play(async()=>{
-          // 0分はアラームを作らず、音の準備後に同じドキュメントと結果URLを再確認。
-          try{
-            const {enabled=false}=await chrome.storage.local.get('enabled');
-            if(!enabled)return false;
-            const answer=await chrome.tabs.sendMessage(sender.tab.id,{type:'confirm-result-alert',nonce:msg.nonce},{documentId:sender.documentId});
-            if(!answer?.ready)return false;
-            const latest=await chrome.storage.local.get('enabled');
-            return Boolean(latest.enabled);
-          }catch{return false;}
-        });
+        // 0分ではリマインドを足さない。即時ベルとは別に予約し、音声準備は待たない。
+        let reminderError;
+        if(minutes>0){
+          try{await chrome.alarms.create(name,{when:Date.now()+minutes*60_000});}
+          catch(e){reminderError=e.message;}
+        }
+        return {immediate:immediateEnabled!==false,reminderError};
+      }).then(async ({immediate,reminderError})=>{
+        if(immediate)await playResult(sender.tab.id,sender.documentId,msg.nonce,'initial');
+        if(reminderError)return {ok:false,error:reminderError};
         return {ok:true};
       });
     }else if(msg.type==='cancel-result-alert'){
@@ -89,15 +103,8 @@ chrome.alarms.onAlarm.addListener(({name})=>{
   const match=resultAlarm.exec(name);
   if(!match)return;
   const [,tabId,documentId,nonce]=match;
-  // タブが閉じた、移動した、待機を取り消した場合は鳴らさない。
-  void chrome.tabs.sendMessage(Number(tabId),{type:'confirm-result-alert',nonce},{documentId})
-    .then(answer=>{
-      if(!answer?.ready)return;
-      return serial(async()=>{
-        const {enabled=false}=await chrome.storage.local.get('enabled');
-        if(enabled)await play();
-      });
-    }).catch(()=>{});
+  // 音声準備後、同じリザルトを表示していると確認できたときだけ鳴らす。
+  void playResult(Number(tabId),documentId,nonce,'reminder').catch(()=>{});
 });
 chrome.runtime.onInstalled.addListener(()=>{
   // 旧版に限り残り得る検知履歴を外し、音量や選択などは保持する。

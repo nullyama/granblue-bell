@@ -11,3 +11,10 @@
 .delay-controls .secondary{flex:none;margin-left:auto}
 .monitor #delayFeedback:empty{display:none}
 .monitor #delayFeedback[data-error=true]{color:#a3302e}
+
+.immediate-row{border-top:1px solid #d7e3ea;margin-top:10px;padding-top:10px}
+.immediate-row>div>label{font-weight:700;font-size:12px}
+.switch input:disabled{cursor:default}
+.monitor #immediateFeedback:empty{display:none}
+.monitor #immediateFeedback[data-error=true]{color:#a3302e}
+.monitor #silentHelp{font-weight:700}
